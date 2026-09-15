@@ -1,0 +1,5 @@
+# Allow every crawler to index the whole site.
+User-agent: *
+Allow: /
+
+Sitemap: https://fantasydraftvalue.com/sitemap.xml

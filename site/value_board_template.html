@@ -1,0 +1,725 @@
+<title>Value Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #eef1ec;
+    --paper-raised: #ffffff;
+    --paper-sunken: #e4e8e1;
+    --ink: #1d2420;
+    --ink-soft: #5c665f;
+    --ink-faint: #8a938c;
+    --line: #d7dbd1;
+    --accent: #a5702c;
+    --accent-ink: #ffffff;
+    --accent-tint: #f3e6d4;
+    --good: #2c7a4f;
+    --good-tint: #e2f0e6;
+    --good-line: #bcdcc7;
+    --bad: #ad4433;
+    --bad-tint: #f5e6e2;
+    --bad-line: #e0c1b8;
+    --shadow: 0 1px 2px rgba(29,36,32,0.06), 0 6px 16px -8px rgba(29,36,32,0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181a;
+      --paper-raised: #1c2124;
+      --paper-sunken: #101314;
+      --ink: #edefe9;
+      --ink-soft: #a2ac9f;
+      --ink-faint: #6d766a;
+      --line: #2c3330;
+      --accent: #d99e57;
+      --accent-ink: #1a1206;
+      --accent-tint: #3a2c17;
+      --good: #55c383;
+      --good-tint: #16281f;
+      --good-line: #2a4636;
+      --bad: #e2806c;
+      --bad-tint: #2f1c18;
+      --bad-line: #4a2c26;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #14181a;
+    --paper-raised: #1c2124;
+    --paper-sunken: #101314;
+    --ink: #edefe9;
+    --ink-soft: #a2ac9f;
+    --ink-faint: #6d766a;
+    --line: #2c3330;
+    --accent: #d99e57;
+    --accent-ink: #1a1206;
+    --accent-tint: #3a2c17;
+    --good: #55c383;
+    --good-tint: #16281f;
+    --good-line: #2a4636;
+    --bad: #e2806c;
+    --bad-tint: #2f1c18;
+    --bad-line: #4a2c26;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 64px;
+  }
+
+  /* ---------- Masthead ---------- */
+
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 16px;
+    margin-bottom: 18px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand h1 {
+    font-family: "Oswald", ui-sans-serif, sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: 0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .brand .mark {
+    font-family: "Oswald", sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    background: var(--accent);
+    padding: 4px 8px;
+    border-radius: 3px;
+    transform: translateY(-2px);
+  }
+
+  .masthead-meta {
+    text-align: right;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .masthead-meta strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .subhead {
+    font-size: 15.5px;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0 0 22px;
+  }
+
+  /* ---------- Status banner ---------- */
+
+  .banner {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--accent-tint);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 11px 14px;
+    margin-bottom: 26px;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+
+  .banner svg { flex: none; margin-top: 2px; }
+  .banner strong { font-weight: 600; }
+
+  /* ---------- Position toggle ---------- */
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .toggle {
+    display: inline-flex;
+    gap: 4px;
+    background: var(--paper-sunken);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .toggle button {
+    font-family: "Oswald", sans-serif;
+    font-weight: 500;
+    font-size: 14.5px;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .toggle button:hover { color: var(--ink); }
+
+  .toggle button.active {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .toggle button:focus-visible,
+  .scope button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .scope {
+    display: inline-flex;
+    gap: 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  .scope button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+  }
+
+  .scope button.active { color: var(--ink); font-weight: 600; text-decoration: none; }
+
+  /* The second toggle row (Rank-by / Scoring format) reuses .toggle-row's
+     flex/gap/wrap behavior but left-aligns its groups instead of spreading
+     them to the row's edges. */
+  .toggle-row-secondary {
+    justify-content: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .legend-line {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 10px 0 26px;
+  }
+
+  .legend-line b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- Panels ---------- */
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+
+  @media (max-width: 780px) {
+    .panels { grid-template-columns: 1fr; }
+    .masthead { flex-direction: column; align-items: flex-start; }
+    .masthead-meta { text-align: left; }
+  }
+
+  .panel {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .panel.over .panel-head { border-top: 4px solid var(--good); }
+  .panel.under .panel-head { border-top: 4px solid var(--bad); }
+
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: "Oswald", sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.01em;
+  }
+
+  .panel.over .panel-title { color: var(--good); }
+  .panel.under .panel-title { color: var(--bad); }
+
+  .panel-title .tri { font-size: 12px; }
+
+  .panel-sub {
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  thead th {
+    text-align: left;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 600;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  thead th.num, td.num { text-align: right; }
+  thead th.mid, td.mid { text-align: center; }
+
+  tbody tr { border-bottom: 1px solid var(--line); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--paper-sunken); }
+
+  td { padding: 9px 10px; vertical-align: middle; }
+
+  .player-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .player-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .player-sub {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .rank-chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--paper-sunken);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+
+  .delta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 12.5px;
+    border-radius: 4px;
+    padding: 3px 7px;
+    white-space: nowrap;
+  }
+
+  .delta-chip.pos { color: var(--good); background: var(--good-tint); border: 1px solid var(--good-line); }
+  .delta-chip.neg { color: var(--bad); background: var(--bad-tint); border: 1px solid var(--bad-line); }
+  .delta-chip.zero { color: var(--ink-faint); background: var(--paper-sunken); border: 1px solid var(--line); }
+
+  .panel-foot {
+    padding: 9px 18px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  .empty-state {
+    padding: 28px 18px;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+
+  footer.page-foot {
+    margin-top: 34px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="brand">
+      <h1>Value Board</h1>
+      <span class="mark">ADP Watch</span>
+    </div>
+    <div class="masthead-meta">
+      BOS ADP locked <strong id="lockDate">&mdash;</strong> &middot; scoring <strong id="scoringFormat">&mdash;</strong><br>
+      <span id="sourceLine">source &mdash;</span>
+    </div>
+  </div>
+
+  <p class="subhead">Who's outplaying their draft slot, and who isn't &mdash; ranked by position against beginning&#8209;of&#8209;season ADP.</p>
+
+  <div class="banner" id="statusBanner">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 7v4.2M8 4.6v.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <span id="statusBannerText">Loading&hellip;</span>
+  </div>
+
+  <div class="toggle-row">
+    <div class="toggle" id="positionToggle" role="group" aria-label="Position"></div>
+    <div class="scope" id="scopeToggle" role="group" aria-label="List size">
+      <button type="button" data-scope="short" class="active">Top movers</button>
+      <button type="button" data-scope="full">Full position</button>
+    </div>
+  </div>
+
+  <div class="toggle-row toggle-row-secondary">
+    <div class="toggle" id="metricToggle" role="group" aria-label="Rank by">
+      <button type="button" data-metric="total" class="active">Season Total</button>
+      <button type="button" data-metric="ppg">Per Game</button>
+    </div>
+    <div class="toggle" id="formatToggle" role="group" aria-label="Scoring format">
+      <button type="button" data-format="ppr" class="active">PPR</button>
+      <button type="button" data-format="half_ppr">Half-PPR</button>
+      <button type="button" data-format="standard">Standard</button>
+    </div>
+  </div>
+
+  <p class="legend-line"><b>Delta</b> = ADP position rank &minus; current position rank (<span id="formatLabel">PPR</span>, <span id="metricLabel">season&#8209;total</span> points). Positive means outperforming draft slot; negative means underperforming it.</p>
+
+  <div class="panels">
+    <section class="panel over">
+      <div class="panel-head">
+        <div class="panel-title"><span class="tri">&#9650;</span> Overperformers</div>
+        <div class="panel-sub" id="overSub"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th class="mid">ADP Rk</th>
+              <th class="mid">Now Rk</th>
+              <th class="num">Delta</th>
+            </tr>
+          </thead>
+          <tbody id="overBody"></tbody>
+        </table>
+      </div>
+      <div class="panel-foot" id="overFoot"></div>
+    </section>
+
+    <section class="panel under">
+      <div class="panel-head">
+        <div class="panel-title"><span class="tri">&#9660;</span> Underperformers</div>
+        <div class="panel-sub" id="underSub"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th class="mid">ADP Rk</th>
+              <th class="mid">Now Rk</th>
+              <th class="num">Delta</th>
+            </tr>
+          </thead>
+          <tbody id="underBody"></tbody>
+        </table>
+      </div>
+      <div class="panel-foot" id="underFoot"></div>
+    </section>
+  </div>
+
+  <footer class="page-foot">
+    <span>Value Board &middot; ADP: FantasyFootballCalculator.com &middot; performance: nflverse</span>
+    <span id="footRight">Positional ADP: Standard / PPR / Half&#8209;PPR dataset, top 250 overall</span>
+  </footer>
+
+</div>
+
+<script>
+  // ---------------------------------------------------------------------
+  // RAW is injected by scripts/build_site.py, which replaces the token
+  // below with the contents of data/dashboard_data.json. Do not hand-edit
+  // the object literal here -- edit the data pipeline instead and re-run
+  // `python3 scripts/build_site.py` to regenerate this file.
+  // ---------------------------------------------------------------------
+  const RAW = __DASHBOARD_JSON__;
+
+  const DATA = RAW.positions;   // { "QB": [ {player, team, overallRank, gamesPlayed, formats: {standard, half_ppr, ppr}}, ... ], ... }
+  const META = RAW.meta;        // { season, generatedAt, defaultScoringFormat, maxGamesPlayed, status, playersMatched, playersUnmatched }
+
+  // Each `formats` entry is {adpRank, adp, currentRankTotal, deltaTotal,
+  // currentRankPPG, deltaPPG} -- or all-null if that player has no ADP in
+  // that particular scoring format. FORMAT_LABELS is the display text for
+  // the Scoring format toggle and the masthead/legend/banner.
+  const FORMAT_LABELS = { ppr: "PPR", half_ppr: "Half-PPR", standard: "Standard" };
+
+  // Positions rendered in the toggle, in the order they should appear.
+  // Only positions that actually exist in DATA are shown (keeps this
+  // working even if a future ADP file drops a position).
+  const POSITIONS = ["QB", "RB", "WR", "TE", "K", "D/ST"].filter(p => DATA[p] && DATA[p].length);
+  let currentPos = POSITIONS.includes("RB") ? "RB" : POSITIONS[0];
+  let scope = "short";
+  // "Now Rk" can mean two different things -- each player's rank by total
+  // points scored this season, or by their points-per-game -- and this
+  // dashboard defaults to season-total. `metric` tracks which is active;
+  // everything below reads `currentRankTotal`/`deltaTotal` or
+  // `currentRankPPG`/`deltaPPG` depending on it.
+  let metric = "total";
+  // Which of the three scoring formats' ADP (and matching current-rank
+  // data) is currently displayed. Defaults to whatever the data pipeline
+  // marked as the default, falling back to PPR if that's ever missing.
+  let scoringFormat = META.defaultScoringFormat || "ppr";
+
+  // ---- Masthead + status banner, filled in from META --------------------
+  function formatGeneratedDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  document.getElementById("lockDate").textContent = "09.09." + META.season;
+  document.getElementById("sourceLine").textContent =
+    "data as of " + formatGeneratedDate(META.generatedAt) + " · week " + META.maxGamesPlayed + " of " + META.season;
+
+  function updateMasthead() {
+    document.getElementById("scoringFormat").textContent = FORMAT_LABELS[scoringFormat];
+  }
+
+  const bannerText = document.getElementById("statusBannerText");
+  function updateBanner() {
+    if (META.status === "pre_season") {
+      bannerText.innerHTML =
+        "<strong>Preseason — no games played yet.</strong> “Now Rk” will start filling in once " +
+        META.season + " Week 1 stats are in. Re-run the data pipeline after games to refresh this page.";
+      return;
+    }
+    const metricPhrase = metric === "total" ? "total fantasy points scored" : "fantasy points per game";
+    const unmatchedNote = META.playersUnmatched > 0
+      ? (" " + META.playersUnmatched + " ADP player(s) have no matching current-season stats yet (rookies pending a debut, etc.) and show ADP rank only.")
+      : "";
+    bannerText.innerHTML =
+      "<strong>Live through week " + META.maxGamesPlayed + " of " + META.season + ".</strong> " +
+      "“Now Rk” is each player's rank within their position by " + metricPhrase +
+      " in " + FORMAT_LABELS[scoringFormat] + " scoring so far this season." + unmatchedNote;
+  }
+  updateMasthead();
+  updateBanner();
+
+  // ---- Position toggle ----------------------------------------------------
+  const positionToggleEl = document.getElementById("positionToggle");
+  POSITIONS.forEach(pos => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = pos;
+    btn.dataset.pos = pos;
+    btn.setAttribute("aria-pressed", pos === currentPos ? "true" : "false");
+    if (pos === currentPos) btn.classList.add("active");
+    btn.addEventListener("click", () => { currentPos = pos; render(); });
+    positionToggleEl.appendChild(btn);
+  });
+
+  // ---- Rank-by (Season Total / Per Game) toggle ----------------------------
+  document.querySelectorAll("#metricToggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      metric = btn.dataset.metric;
+      document.getElementById("metricLabel").textContent =
+        metric === "total" ? "season‑total" : "per‑game";
+      updateBanner();
+      render();
+    });
+  });
+
+  // ---- Scoring format (PPR / Half-PPR / Standard) toggle -------------------
+  document.querySelectorAll("#formatToggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      scoringFormat = btn.dataset.format;
+      document.getElementById("formatLabel").textContent = FORMAT_LABELS[scoringFormat];
+      updateMasthead();
+      updateBanner();
+      render();
+    });
+  });
+
+  // ---- List-size (Top movers / Full position) toggle ------------------------
+  document.querySelectorAll("#scopeToggle button").forEach(btn => {
+    btn.addEventListener("click", () => { scope = btn.dataset.scope; render(); });
+  });
+
+  function deltaChip(delta) {
+    const cls = delta > 0 ? "pos" : delta < 0 ? "neg" : "zero";
+    const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "–";
+    const label = delta === 0 ? "even" : Math.abs(delta);
+    return `<span class="delta-chip ${cls}">${arrow} ${label}</span>`;
+  }
+
+  function row(p) {
+    return `<tr>
+      <td class="player-cell-wrap">
+        <div class="player-cell">
+          <span class="player-name">${p.player}</span>
+          <span class="player-sub">${p.team} &middot; pick ${p.adp.toFixed(1)}</span>
+        </div>
+      </td>
+      <td class="mid"><span class="rank-chip">${p.pos}${p.adpRank}</span></td>
+      <td class="mid"><span class="rank-chip">${p.pos}${p.currentRank}</span></td>
+      <td class="num">${deltaChip(p.delta)}</td>
+    </tr>`;
+  }
+
+  function emptyRow(message) {
+    return `<tr><td colspan="4" class="empty-state">${message}</td></tr>`;
+  }
+
+  function render() {
+    document.querySelectorAll("#positionToggle button").forEach(b => {
+      const on = b.dataset.pos === currentPos;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    document.querySelectorAll("#metricToggle button").forEach(b => {
+      b.classList.toggle("active", b.dataset.metric === metric);
+    });
+    document.querySelectorAll("#formatToggle button").forEach(b => {
+      b.classList.toggle("active", b.dataset.format === scoringFormat);
+    });
+    document.querySelectorAll("#scopeToggle button").forEach(b => {
+      b.classList.toggle("active", b.dataset.scope === scope);
+    });
+
+    // Pull out the block for the currently-selected scoring format, then
+    // normalize each player down to a single currentRank/delta pair drawn
+    // from whichever metric ("total" or "ppg") is currently selected --
+    // everything below this line doesn't need to know either toggle exists.
+    // A player with no ADP at all in this scoring format (a blank cell in
+    // the source data -- see build_dashboard_data.py) is dropped entirely
+    // rather than shown with a missing ADP Rk.
+    const full = (DATA[currentPos] || [])
+      .filter(p => p.formats[scoringFormat].adpRank !== null)
+      .map(p => {
+        const f = p.formats[scoringFormat];
+        return {
+          player: p.player,
+          team: p.team,
+          pos: currentPos,
+          adpRank: f.adpRank,
+          adp: f.adp,
+          currentRank: metric === "total" ? f.currentRankTotal : f.currentRankPPG,
+          delta: metric === "total" ? f.deltaTotal : f.deltaPPG,
+        };
+      });
+    const n = full.length;
+
+    // Only players with an actual current-season rank can be placed on
+    // either the Overperformers or Underperformers list -- there's
+    // nothing to compare yet for a player with no games played.
+    const reporting = full.filter(p => p.delta !== null);
+    const notReporting = n - reporting.length;
+    const shortCount = Math.max(5, Math.min(10, Math.round(Math.max(reporting.length, 1) / 3)));
+
+    if (reporting.length === 0) {
+      document.getElementById("overBody").innerHTML =
+        emptyRow(`No ${currentPos} have current-season stats yet.`);
+      document.getElementById("underBody").innerHTML =
+        emptyRow(`No ${currentPos} have current-season stats yet.`);
+      document.getElementById("overSub").textContent = `${currentPos} · 0 of ${n}`;
+      document.getElementById("underSub").textContent = `${currentPos} · 0 of ${n}`;
+      document.getElementById("overFoot").textContent = "Waiting on this season's first games.";
+      document.getElementById("underFoot").textContent = "Waiting on this season's first games.";
+      return;
+    }
+
+    const overSorted = [...reporting].sort((a, b) => b.delta - a.delta || a.adpRank - b.adpRank);
+    const underSorted = [...reporting].sort((a, b) => a.delta - b.delta || a.adpRank - b.adpRank);
+
+    const overList = scope === "short" ? overSorted.slice(0, shortCount) : overSorted;
+    const underList = scope === "short" ? underSorted.slice(0, shortCount) : underSorted;
+
+    document.getElementById("overBody").innerHTML = overList.map(row).join("");
+    document.getElementById("underBody").innerHTML = underList.map(row).join("");
+
+    document.getElementById("overSub").textContent = `${currentPos} · ${overList.length} of ${reporting.length}`;
+    document.getElementById("underSub").textContent = `${currentPos} · ${underList.length} of ${reporting.length}`;
+
+    const notReportingNote = notReporting > 0 ? ` (${notReporting} not reporting yet)` : "";
+    document.getElementById("overFoot").textContent =
+      (scope === "short"
+        ? `Showing biggest risers — switch to "Full position" for all ${reporting.length}.`
+        : `All ${reporting.length} reporting ${currentPos}, best delta first.`) + notReportingNote;
+    document.getElementById("underFoot").textContent =
+      (scope === "short"
+        ? `Showing biggest fallers — switch to "Full position" for all ${reporting.length}.`
+        : `All ${reporting.length} reporting ${currentPos}, worst delta first.`) + notReportingNote;
+  }
+
+  render();
+</script>

@@ -1,0 +1,9 @@
+# Raw source CSVs downloaded from nflverse. These are large (tens of MB
+# combined) and fully reproducible by re-running fetch_current_performance.py,
+# so there's no reason to commit them to a repo or ship them in a zip.
+data/raw/
+
+# Local editor/OS clutter
+.DS_Store
+__pycache__/
+*.pyc
