@@ -135,7 +135,7 @@
 
   .masthead-right {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     gap: 12px;
   }
 
@@ -143,6 +143,7 @@
     text-align: right;
     font-family: "IBM Plex Mono", ui-monospace, monospace;
     font-size: 12.5px;
+    font-style: italic;
     color: var(--ink-soft);
     line-height: 1.6;
   }
@@ -253,32 +254,29 @@
   }
 
   .toggle button:focus-visible,
-  .scope button:focus-visible {
+  .see-all-btn:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
-  .scope {
-    display: inline-flex;
-    gap: 14px;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 12.5px;
-    color: var(--ink-soft);
-  }
-
-  .scope button {
+  /* "See All" / "Show Top 10" link-style button in each panel's footer --
+     visually matches the old Top movers/Full position toggle it replaced. */
+  .see-all-btn {
+    flex: none;
     background: none;
     border: none;
     padding: 0;
-    color: inherit;
+    color: var(--ink-soft);
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
-    font-family: inherit;
-    font-size: inherit;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    font-weight: 600;
   }
 
-  .scope button.active { color: var(--ink); font-weight: 600; text-decoration: none; }
+  .see-all-btn:hover { color: var(--ink); }
+  .see-all-btn[hidden] { display: none; }
 
   /* The second toggle row (Rank-by / Scoring format) reuses .toggle-row's
      flex/gap/wrap behavior but left-aligns its groups instead of spreading
@@ -371,12 +369,21 @@
 
   thead th.num, td.num { text-align: right; }
   thead th.mid, td.mid { text-align: center; }
+  thead th.idx, td.idx { text-align: right; width: 1%; }
 
   tbody tr { border-bottom: 1px solid var(--line); }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: var(--paper-sunken); }
 
   td { padding: 9px 10px; vertical-align: middle; }
+
+  /* The list's rank number (1, 2, 3...), not to be confused with the
+     ADP/Now position-rank chips -- muted so it doesn't compete with them. */
+  td.idx {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
 
   .player-cell {
     display: flex;
@@ -428,6 +435,10 @@
   .delta-chip.zero { color: var(--ink-faint); background: var(--paper-sunken); border: 1px solid var(--line); }
 
   .panel-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
     padding: 9px 18px;
     font-size: 11.5px;
     color: var(--ink-faint);
@@ -467,6 +478,9 @@
       <span class="mark">ADP Watch</span>
     </div>
     <div class="masthead-right">
+      <div class="masthead-meta">
+        <span id="sourceLine">&mdash;</span>
+      </div>
       <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false">
         <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <circle cx="8" cy="8" r="3.3" stroke="currentColor" stroke-width="1.4"/>
@@ -476,10 +490,6 @@
           <path d="M13.4 9.7A5.8 5.8 0 1 1 6.3 2.6a4.6 4.6 0 0 0 7.1 7.1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
         </svg>
       </button>
-      <div class="masthead-meta">
-        BOS ADP locked <strong id="lockDate">&mdash;</strong> &middot; scoring <strong id="scoringFormat">&mdash;</strong><br>
-        <span id="sourceLine">source &mdash;</span>
-      </div>
     </div>
   </div>
 
@@ -492,10 +502,6 @@
 
   <div class="toggle-row">
     <div class="toggle" id="positionToggle" role="group" aria-label="Position"></div>
-    <div class="scope" id="scopeToggle" role="group" aria-label="List size">
-      <button type="button" data-scope="short" class="active">Top movers</button>
-      <button type="button" data-scope="full">Full position</button>
-    </div>
   </div>
 
   <div class="toggle-row toggle-row-secondary">
@@ -522,6 +528,7 @@
         <table>
           <thead>
             <tr>
+              <th class="idx">#</th>
               <th>Player</th>
               <th class="mid">ADP Rk</th>
               <th class="mid">Now Rk</th>
@@ -531,7 +538,10 @@
           <tbody id="overBody"></tbody>
         </table>
       </div>
-      <div class="panel-foot" id="overFoot"></div>
+      <div class="panel-foot">
+        <span id="overFoot"></span>
+        <button type="button" class="see-all-btn" id="overSeeAllBtn"></button>
+      </div>
     </section>
 
     <section class="panel under">
@@ -543,6 +553,7 @@
         <table>
           <thead>
             <tr>
+              <th class="idx">#</th>
               <th>Player</th>
               <th class="mid">ADP Rk</th>
               <th class="mid">Now Rk</th>
@@ -552,7 +563,10 @@
           <tbody id="underBody"></tbody>
         </table>
       </div>
-      <div class="panel-foot" id="underFoot"></div>
+      <div class="panel-foot">
+        <span id="underFoot"></span>
+        <button type="button" class="see-all-btn" id="underSeeAllBtn"></button>
+      </div>
     </section>
   </div>
 
@@ -585,6 +599,15 @@
   // "RB37" that looks like an exact rank.
   const POSITION_RANK_CAPS = META.positionRankCaps || {};
 
+  // True if `rank` is this position's "+" bucket value (everyone at or
+  // below the roster-depth cutoff, lumped together -- see cap_rank() in
+  // build_dashboard_data.py). Used both to render the "+" suffix and to
+  // decide which rows are excluded from the "See All" list below.
+  function isCappedRank(pos, rank) {
+    const cap = POSITION_RANK_CAPS[pos];
+    return cap !== undefined && rank === cap + 1;
+  }
+
   // Each `formats` entry is {adpRank, adp, currentRankTotal, deltaTotal,
   // currentRankPPG, deltaPPG} -- or all-null if that player has no ADP in
   // that particular scoring format. FORMAT_LABELS is the display text for
@@ -595,8 +618,18 @@
   // Only positions that actually exist in DATA are shown (keeps this
   // working even if a future ADP file drops a position).
   const POSITIONS = ["QB", "RB", "WR", "TE", "K", "D/ST"].filter(p => DATA[p] && DATA[p].length);
+  // Each Overperformers/Underperformers panel shows this many rows by
+  // default, before its own "See All" button is clicked.
+  const TOP_N = 10;
   let currentPos = POSITIONS.includes("RB") ? "RB" : POSITIONS[0];
-  let scope = "short";
+  // Each panel defaults to its top 10; clicking that panel's "See All"
+  // button flips its own flag and re-renders just that list expanded to
+  // everyone reporting. Independent per panel (expanding Overperformers
+  // doesn't touch Underperformers), and both reset to collapsed whenever
+  // the position changes, so switching from RB to WR doesn't leave you
+  // looking at an oddly-already-expanded list.
+  let overExpanded = false;
+  let underExpanded = false;
   // "Now Rk" can mean two different things -- each player's rank by total
   // points scored this season, or by their points-per-game -- and this
   // dashboard defaults to season-total. `metric` tracks which is active;
@@ -609,21 +642,12 @@
   let scoringFormat = META.defaultScoringFormat || "ppr";
 
   // ---- Masthead + status banner, filled in from META --------------------
-  function formatGeneratedDate(iso) {
-    try {
-      return new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
-    } catch (e) {
-      return iso;
-    }
-  }
-
-  document.getElementById("lockDate").textContent = "09.09." + META.season;
+  // The masthead itself just states how current the data is -- which
+  // scoring format is active is already obvious from the highlighted
+  // button in the PPR / Half-PPR / Standard toggle below, so it isn't
+  // repeated up here.
   document.getElementById("sourceLine").textContent =
-    "data as of " + formatGeneratedDate(META.generatedAt) + " · week " + META.maxGamesPlayed + " of " + META.season;
-
-  function updateMasthead() {
-    document.getElementById("scoringFormat").textContent = FORMAT_LABELS[scoringFormat];
-  }
+    "Scoring data through week " + META.maxGamesPlayed;
 
   const bannerText = document.getElementById("statusBannerText");
   function updateBanner() {
@@ -642,7 +666,6 @@
       "“Now Rk” is each player's rank within their position by " + metricPhrase +
       " in " + FORMAT_LABELS[scoringFormat] + " scoring so far this season." + unmatchedNote;
   }
-  updateMasthead();
   updateBanner();
 
   // ---- Position toggle ----------------------------------------------------
@@ -654,7 +677,12 @@
     btn.dataset.pos = pos;
     btn.setAttribute("aria-pressed", pos === currentPos ? "true" : "false");
     if (pos === currentPos) btn.classList.add("active");
-    btn.addEventListener("click", () => { currentPos = pos; render(); });
+    btn.addEventListener("click", () => {
+      currentPos = pos;
+      overExpanded = false;
+      underExpanded = false;
+      render();
+    });
     positionToggleEl.appendChild(btn);
   });
 
@@ -674,15 +702,19 @@
     btn.addEventListener("click", () => {
       scoringFormat = btn.dataset.format;
       document.getElementById("formatLabel").textContent = FORMAT_LABELS[scoringFormat];
-      updateMasthead();
       updateBanner();
       render();
     });
   });
 
-  // ---- List-size (Top movers / Full position) toggle ------------------------
-  document.querySelectorAll("#scopeToggle button").forEach(btn => {
-    btn.addEventListener("click", () => { scope = btn.dataset.scope; render(); });
+  // ---- Per-panel "See All" / "Show Top 10" buttons ---------------------------
+  document.getElementById("overSeeAllBtn").addEventListener("click", () => {
+    overExpanded = !overExpanded;
+    render();
+  });
+  document.getElementById("underSeeAllBtn").addEventListener("click", () => {
+    underExpanded = !underExpanded;
+    render();
   });
 
   // ---- Light/dark theme toggle ---------------------------------------------
@@ -723,9 +755,7 @@
   // this number represents "this deep or worse," not an exact rank.
   function rankLabel(pos, rank) {
     if (rank === null || rank === undefined) return `${pos}–`;
-    const cap = POSITION_RANK_CAPS[pos];
-    const suffix = cap !== undefined && rank === cap + 1 ? "+" : "";
-    return `${pos}${rank}${suffix}`;
+    return `${pos}${rank}${isCappedRank(pos, rank) ? "+" : ""}`;
   }
 
   function deltaChip(delta) {
@@ -735,8 +765,12 @@
     return `<span class="delta-chip ${cls}">${arrow} ${label}</span>`;
   }
 
-  function row(p) {
+  // `idx` is this row's position within the currently-displayed list
+  // (1, 2, 3...) -- purely a "how far down the list is this" counter, not
+  // to be confused with the ADP Rk / Now Rk position-rank chips next to it.
+  function row(p, idx) {
     return `<tr>
+      <td class="idx">${idx}</td>
       <td class="player-cell-wrap">
         <div class="player-cell">
           <span class="player-name">${p.player}</span>
@@ -750,7 +784,24 @@
   }
 
   function emptyRow(message) {
-    return `<tr><td colspan="4" class="empty-state">${message}</td></tr>`;
+    return `<tr><td colspan="5" class="empty-state">${message}</td></tr>`;
+  }
+
+  // Fills in one panel's footer: the summary text, and the "See All" /
+  // "Show Top 10" button (hidden entirely when there's nothing to expand).
+  function renderPanelFoot(prefix, reportingCount, expanded, notReportingNote) {
+    const seeAllBtn = document.getElementById(`${prefix}SeeAllBtn`);
+    const footText = document.getElementById(`${prefix}Foot`);
+    if (reportingCount <= TOP_N) {
+      footText.textContent = `All ${reportingCount} reporting ${currentPos}.` + notReportingNote;
+      seeAllBtn.hidden = true;
+      return;
+    }
+    footText.textContent =
+      (expanded ? `All ${reportingCount} reporting ${currentPos}.` : `Top ${TOP_N} of ${reportingCount} reporting ${currentPos}.`)
+      + notReportingNote;
+    seeAllBtn.hidden = false;
+    seeAllBtn.textContent = expanded ? "Show Top 10" : "See All";
   }
 
   function render() {
@@ -764,9 +815,6 @@
     });
     document.querySelectorAll("#formatToggle button").forEach(b => {
       b.classList.toggle("active", b.dataset.format === scoringFormat);
-    });
-    document.querySelectorAll("#scopeToggle button").forEach(b => {
-      b.classList.toggle("active", b.dataset.scope === scope);
     });
 
     // Pull out the block for the currently-selected scoring format, then
@@ -794,10 +842,19 @@
 
     // Only players with an actual current-season rank can be placed on
     // either the Overperformers or Underperformers list -- there's
-    // nothing to compare yet for a player with no games played.
-    const reporting = full.filter(p => p.delta !== null);
-    const notReporting = n - reporting.length;
-    const shortCount = Math.max(5, Math.min(10, Math.round(Math.max(reporting.length, 1) / 3)));
+    // nothing to compare yet for a player with no games played. On top of
+    // that, a player whose ADP *and* current rank are both bucketed at
+    // this position's "+" cutoff (e.g. both show "RB37+") is excluded
+    // entirely: their delta is always exactly 0 (two bucketed values
+    // compared to each other), so they're not a real riser or faller --
+    // just noise crowding out the players who actually moved.
+    const reporting = full.filter(p =>
+      p.delta !== null && !(isCappedRank(p.pos, p.adpRank) && isCappedRank(p.pos, p.currentRank))
+    );
+    const notReporting = n - full.filter(p => p.delta !== null).length;
+
+    const overSeeAllBtn = document.getElementById("overSeeAllBtn");
+    const underSeeAllBtn = document.getElementById("underSeeAllBtn");
 
     if (reporting.length === 0) {
       document.getElementById("overBody").innerHTML =
@@ -808,30 +865,28 @@
       document.getElementById("underSub").textContent = `${currentPos} · 0 of ${n}`;
       document.getElementById("overFoot").textContent = "Waiting on this season's first games.";
       document.getElementById("underFoot").textContent = "Waiting on this season's first games.";
+      overSeeAllBtn.hidden = true;
+      underSeeAllBtn.hidden = true;
       return;
     }
 
     const overSorted = [...reporting].sort((a, b) => b.delta - a.delta || a.adpRank - b.adpRank);
     const underSorted = [...reporting].sort((a, b) => a.delta - b.delta || a.adpRank - b.adpRank);
 
-    const overList = scope === "short" ? overSorted.slice(0, shortCount) : overSorted;
-    const underList = scope === "short" ? underSorted.slice(0, shortCount) : underSorted;
+    const overList = overExpanded ? overSorted : overSorted.slice(0, TOP_N);
+    const underList = underExpanded ? underSorted : underSorted.slice(0, TOP_N);
 
-    document.getElementById("overBody").innerHTML = overList.map(row).join("");
-    document.getElementById("underBody").innerHTML = underList.map(row).join("");
+    document.getElementById("overBody").innerHTML =
+      overList.map((p, i) => row(p, i + 1)).join("");
+    document.getElementById("underBody").innerHTML =
+      underList.map((p, i) => row(p, i + 1)).join("");
 
     document.getElementById("overSub").textContent = `${currentPos} · ${overList.length} of ${reporting.length}`;
     document.getElementById("underSub").textContent = `${currentPos} · ${underList.length} of ${reporting.length}`;
 
     const notReportingNote = notReporting > 0 ? ` (${notReporting} not reporting yet)` : "";
-    document.getElementById("overFoot").textContent =
-      (scope === "short"
-        ? `Showing biggest risers — switch to "Full position" for all ${reporting.length}.`
-        : `All ${reporting.length} reporting ${currentPos}, best delta first.`) + notReportingNote;
-    document.getElementById("underFoot").textContent =
-      (scope === "short"
-        ? `Showing biggest fallers — switch to "Full position" for all ${reporting.length}.`
-        : `All ${reporting.length} reporting ${currentPos}, worst delta first.`) + notReportingNote;
+    renderPanelFoot("over", reporting.length, overExpanded, notReportingNote);
+    renderPanelFoot("under", reporting.length, underExpanded, notReportingNote);
   }
 
   render();
