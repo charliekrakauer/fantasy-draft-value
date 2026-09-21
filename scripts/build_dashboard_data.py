@@ -48,6 +48,23 @@ workbook) gets nulled out entirely *for that format*, so switching the
 dashboard's scoring-format toggle to a format that player lacks just
 drops them from view rather than showing a broken row.
 
+UNDRAFTED PERFORMERS (players in the stats file but NOT in the ADP file)
+--------------------------------------------------------------------------
+"Now Rk" is each ADP-tracked player's rank within their position by
+real points scored -- ranked against EVERY player at that position who
+recorded a stat line that week, not just the ~250 in the ADP file. So a
+player who was never drafted (an emergency starter, a waiver pickup) can
+easily outrank several ADP-tracked players, and if they're just left out
+of the dashboard, they silently "eat" a rank slot: the ADP-tracked
+players' Now Rk numbers jump (3, 5, 6...) with no explanation of the
+missing 4. build_dataset()'s UNDRAFTED PERFORMERS section (below the
+main ADP loop) fixes this by adding an entry for every such player too
+-- ADP rank bucketed at their position's "+" cutoff (never having a
+preseason ADP means, by definition, going no better than the
+worst-drafted players at that position), current rank their own real,
+capped rank. That closes the gap in the Now Rk sequence and surfaces
+them for what they usually are: a dramatic, unexpected overperformer.
+
 THREE SCORING FORMATS, EACH WITH TWO "NOW RK" MODES
 ------------------------------------------------------
 Every player gets a `formats` object keyed "standard" / "half_ppr" / "ppr",
@@ -320,6 +337,63 @@ def build_dataset(season: int):
         }
         by_position.setdefault(row["position"], []).append(entry)
 
+    # ------------------------------------------------------------------
+    # UNDRAFTED PERFORMERS
+    # ------------------------------------------------------------------
+    # Everything above only ever looks at players FROM the ADP file. But
+    # nflverse's stats file also includes players who were never on the
+    # preseason ADP list at all -- an injury fill-in, a waiver pickup, a
+    # rookie nobody drafted -- and one of those can easily outscore half
+    # the ADP-tracked field in a given week. Left out entirely, a player
+    # like that silently "eats" a rank slot: e.g. the actual #4 tight end
+    # in real points that week is one of these, so the ADP-tracked TEs
+    # visibly jump from Now Rk 3 to 5 with no explanation. Since never
+    # having a preseason ADP is, by definition, going no better than the
+    # worst-drafted players at the position, each one is added here with
+    # their ADP rank bucketed at the position's "+" cutoff (same bucket
+    # used everywhere else for "ranked beyond the depth cutoff") and
+    # their own real, capped current rank -- which both closes that gap
+    # in the Now Rk sequence AND surfaces them for what they usually are:
+    # a dramatic, unexpected overperformer.
+    undrafted_added = []
+    if not perf.empty:
+        adp_join_keys = set(adp["join_key"])
+        for _, prow in perf.iterrows():
+            if prow["join_key"] in adp_join_keys:
+                continue  # already handled above as a matched ADP player
+            position = prow["position"]
+            cap = POSITION_RANK_CAPS.get(position)
+            if cap is None:
+                continue  # no roster-depth cutoff defined for this position
+            bucketed_adp_rank = cap + 1
+
+            formats = {}
+            for fmt in FORMATS:
+                key = fmt["key"]
+                current_rank_total = cap_rank(int(prow[f"{key}_pos_rank"]), position)
+                current_rank_ppg = cap_rank(int(prow[f"{key}_ppg_pos_rank"]), position)
+                formats[key] = {
+                    "adpRank": bucketed_adp_rank,
+                    "adp": None,  # never had a real preseason ADP pick number
+                    "currentRankTotal": current_rank_total,
+                    "deltaTotal": bucketed_adp_rank - current_rank_total,
+                    "currentRankPPG": current_rank_ppg,
+                    "deltaPPG": bucketed_adp_rank - current_rank_ppg,
+                }
+
+            entry = {
+                "player": prow["player"],
+                "team": prow["team"],
+                "overallRank": 9999,  # no preseason overall rank; unused by the front end
+                "gamesPlayed": int(prow["games_played"]),
+                "formats": formats,
+                # Tells the front end to show "undrafted" instead of a
+                # "pick #.#" subtext, since there's no real ADP value.
+                "undrafted": True,
+            }
+            by_position.setdefault(position, []).append(entry)
+            undrafted_added.append(f"{prow['player']} ({position}, {prow['team']})")
+
     total_games_played = int(perf["games_played"].max()) if not perf.empty else 0
 
     meta = {
@@ -330,6 +404,11 @@ def build_dataset(season: int):
         "status": "in_season" if total_games_played > 0 else "pre_season",
         "playersMatched": matched,
         "playersUnmatched": len(unmatched),
+        # Count of undrafted-performer entries added below (see
+        # UNDRAFTED PERFORMERS above) -- players with real current-week
+        # stats but no preseason ADP at all. Used for the status-banner
+        # note in the front end.
+        "undraftedAdded": len(undrafted_added),
         # Passed through so the front end knows, per position, which
         # displayed rank number means "this cutoff and everyone below it"
         # -- it renders that value with a trailing "+" (e.g. "RB37+").
@@ -352,6 +431,14 @@ def build_dataset(season: int):
             print(f"  - {name}")
         if len(unmatched) > 25:
             print(f"  ... and {len(unmatched) - 25} more")
+
+    if undrafted_added:
+        print(f"Undrafted performers added ({len(undrafted_added)}) -- no preseason ADP, "
+              "bucketed at their position's '+' cutoff, real current rank:")
+        for name in undrafted_added[:25]:
+            print(f"  - {name}")
+        if len(undrafted_added) > 25:
+            print(f"  ... and {len(undrafted_added) - 25} more")
 
     return by_position, meta
 

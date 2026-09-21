@@ -635,8 +635,9 @@
   // ---------------------------------------------------------------------
   const RAW = __DASHBOARD_JSON__;
 
-  const DATA = RAW.positions;   // { "QB": [ {player, team, overallRank, gamesPlayed, formats: {standard, half_ppr, ppr}}, ... ], ... }
-  const META = RAW.meta;        // { season, generatedAt, defaultScoringFormat, maxGamesPlayed, status, playersMatched, playersUnmatched, positionRankCaps }
+  const DATA = RAW.positions;   // { "QB": [ {player, team, overallRank, gamesPlayed, formats: {standard, half_ppr, ppr}, undrafted?}, ... ], ... }
+                                 // `undrafted: true` marks a player with real stats but no preseason ADP at all -- see row()'s pickLabel below.
+  const META = RAW.meta;        // { season, generatedAt, defaultScoringFormat, maxGamesPlayed, status, playersMatched, playersUnmatched, undraftedAdded, positionRankCaps }
 
   // Every adpRank/currentRankTotal/currentRankPPG value coming out of
   // build_dashboard_data.py is already capped to this position's
@@ -720,13 +721,24 @@
       return;
     }
     const metricPhrase = metric === "total" ? "total fantasy points scored" : "fantasy points per game";
+    // Both notes below only apply once the season has started (that's
+    // exactly the condition cap_or_bucket_rank() -- and the undrafted-
+    // performer loop -- gate on in build_dashboard_data.py).
     const unmatchedNote = META.playersUnmatched > 0
-      ? (" " + META.playersUnmatched + " ADP player(s) have no matching current-season stats yet (rookies pending a debut, etc.) and show ADP rank only.")
+      ? (" " + META.playersUnmatched + " ADP player(s) have no current-week stats yet (rookies pending a debut, byes, injuries) and are bucketed at their position's depth cutoff.")
+      : "";
+    // META.undraftedAdded is a board-wide total across every position, not
+    // just the one currently selected, and most of them get filtered out
+    // below as double-capped noise (see the "reporting" comment in
+    // render()) -- so this deliberately says "across the board," not
+    // "shown," to avoid implying that many rows are visible right now.
+    const undraftedNote = META.undraftedAdded > 0
+      ? (" " + META.undraftedAdded + " players across the board have no preseason ADP at all (waiver pickups, injury fill-ins); the notable ones are included too, bucketed at their position's depth cutoff and ranked by real performance.")
       : "";
     bannerText.innerHTML =
       "<strong>Live through week " + META.maxGamesPlayed + " of " + META.season + ".</strong> " +
       "“Now Rk” is each player's rank within their position by " + metricPhrase +
-      " in " + FORMAT_LABELS[scoringFormat] + " scoring so far this season." + unmatchedNote;
+      " in " + FORMAT_LABELS[scoringFormat] + " scoring so far this season." + unmatchedNote + undraftedNote;
   }
   updateBanner();
 
@@ -896,12 +908,17 @@
   // (1, 2, 3...) -- purely a "how far down the list is this" counter, not
   // to be confused with the ADP Rk / Now Rk position-rank chips next to it.
   function row(p, idx) {
+    // p.adp is null for an undrafted performer (see UNDRAFTED PERFORMERS
+    // in build_dashboard_data.py) -- someone with real current-week
+    // stats who was never in the preseason ADP file at all, so there's
+    // no real pick number to show.
+    const pickLabel = p.adp === null ? "undrafted" : `pick ${p.adp.toFixed(1)}`;
     return `<tr>
       <td class="idx">${idx}</td>
       <td class="player-cell-wrap">
         <div class="player-cell">
           <span class="player-name">${p.player}</span>
-          <span class="player-sub">${p.team} &middot; pick ${p.adp.toFixed(1)}</span>
+          <span class="player-sub">${p.team} &middot; ${pickLabel}</span>
         </div>
       </td>
       <td class="mid"><span class="rank-chip">${rankLabel(p.pos, p.adpRank)}</span></td>
