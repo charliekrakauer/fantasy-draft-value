@@ -12,25 +12,54 @@ WHERE THE DATA COMES FROM
 Everything here comes from nflverse (https://github.com/nflverse/nflverse-data),
 a community-maintained, publicly downloadable set of NFL stats built from
 official play-by-play data. No login, no API key, no scraping a rankings
-website -- just CSV files published as GitHub release assets. We use four
-of them:
+website -- just CSV files published as GitHub release assets. We use two:
 
-  1. player_stats.csv          -- weekly offensive stats (QB/RB/WR/TE),
-                                   already includes nflverse's own computed
-                                   `fantasy_points` (standard) and
-                                   `fantasy_points_ppr` (PPR) columns.
-  2. player_stats_kicking.csv  -- weekly kicker stats (field goals by
-                                   distance bucket, extra points).
-  3. player_stats_def.csv      -- weekly *individual* defensive player
-                                   stats (sacks, interceptions, fumble
-                                   recoveries, defensive TDs, safeties).
-                                   We aggregate this up to the TEAM level
-                                   to score Defense/Special Teams (D/ST),
-                                   since fantasy football drafts a team's
-                                   whole defense as one roster slot.
-  4. games.csv                 -- the season schedule with final scores,
-                                   used to compute each team defense's
-                                   "points allowed" score.
+  1. stats_player_week_<season>.csv -- ONE row per player per week, for
+                                        every position (QB/RB/WR/TE/K plus
+                                        individual defensive players),
+                                        covering the season named in the
+                                        filename. This is nflverse's
+                                        current, actively-updated weekly
+                                        file (published under the
+                                        "stats_player" release tag) --
+                                        it already includes nflverse's own
+                                        computed `fantasy_points`
+                                        (standard) and `fantasy_points_ppr`
+                                        (PPR) columns for offense, plus raw
+                                        field-goal/PAT counts for kickers
+                                        and raw sacks/INTs/fumbles/etc for
+                                        individual defenders, all in one
+                                        table.
+
+                                        NOTE: nflverse used to publish this
+                                        as three separate *cumulative,
+                                        all-seasons* files under the
+                                        "player_stats" tag
+                                        (player_stats.csv,
+                                        player_stats_kicking.csv,
+                                        player_stats_def.csv). Those files
+                                        stopped receiving new seasons after
+                                        2024 -- if you see this script
+                                        pointed back at them and a current
+                                        season's games aren't showing up,
+                                        that legacy tag is why. Always
+                                        prefer the per-season
+                                        "stats_player_week_<season>.csv"
+                                        file for anything in-progress.
+  2. games.csv                       -- the season schedule with final
+                                        scores (published under the
+                                        "schedules" tag, one cumulative
+                                        file covering every season,
+                                        updated live as games finish),
+                                        used to compute each team
+                                        defense's "points allowed" score.
+
+Since defensive stats for every individual player live in the same weekly
+file as offense/kicking, we get a team's defense/special-teams (D/ST)
+totals by summing that file's def_*/fumble_recovery_*/special_teams_tds
+columns across everyone on the team for that week -- no separate defense
+file or team lookup needed. Non-defenders simply have zeros in those
+columns, so including them in the sum is harmless.
 
 WHY WE COMPUTE SCORING OURSELVES FOR K AND D/ST
 -------------------------------------------------
@@ -38,13 +67,15 @@ nflverse's `fantasy_points` / `fantasy_points_ppr` columns only cover
 offensive skill positions. There's no standard "team defense fantasy
 points" anywhere in the raw data -- every fantasy site invents its own
 D/ST scoring table -- so we apply a commonly-used, ESPN-default-style
-table ourselves (see `dst_points_for_week` below). If your actual league
-scores kickers or defenses differently, the constants below are the only
-things you need to change.
+table ourselves (see `DST_POINTS` / `POINTS_ALLOWED_TIERS` below). If your
+actual league scores kickers or defenses differently, the constants below
+are the only things you need to change.
 
 USAGE
 -----
     python3 fetch_current_performance.py --season 2026
+    python3 fetch_current_performance.py --season 2026 --max-week 1   # Week 1 only
+    python3 fetch_current_performance.py --season 2026 --refresh      # force re-download
 
 Output: data/current_performance_<season>.csv, one row per player/defense
 with season-to-date fantasy points in all three scoring formats, plus that
@@ -54,8 +85,11 @@ ways -- by season-total points, and by points-per-game -- since the
 dashboard lets you switch between the two.
 
 Raw downloads are cached under data/raw/ so re-running the script doesn't
-re-download ~70MB of CSVs every time. Delete that folder (or pass
---refresh) to force a fresh pull once new games have been played.
+re-download the source CSVs every time. Delete that folder (or pass
+--refresh) to force a fresh pull once new games have been played --
+nflverse updates the current season's weekly file throughout each game
+day, so a --refresh most mornings during the season is enough to stay
+current.
 """
 
 import argparse
@@ -77,14 +111,11 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 # nflverse publishes these as GitHub "release assets" (not regular repo
 # files), which is why the URLs point at /releases/download/... rather than
-# /raw/... or /blob/....
+# /raw/... or /blob/.... The weekly stats file's URL is built per-season in
+# main() (it's stats_player_week_<season>.csv, one file per season); games.csv
+# is the one source that's genuinely one file across every season.
 NFLVERSE_BASE = "https://github.com/nflverse/nflverse-data/releases/download"
-SOURCES = {
-    "player_stats.csv": f"{NFLVERSE_BASE}/player_stats/player_stats.csv",
-    "player_stats_kicking.csv": f"{NFLVERSE_BASE}/player_stats/player_stats_kicking.csv",
-    "player_stats_def.csv": f"{NFLVERSE_BASE}/player_stats/player_stats_def.csv",
-    "games.csv": f"{NFLVERSE_BASE}/schedules/games.csv",
-}
+GAMES_URL = f"{NFLVERSE_BASE}/schedules/games.csv"
 
 # ---------------------------------------------------------------------------
 # D/ST scoring table (standard ESPN-default-style scoring).
@@ -139,12 +170,11 @@ def points_allowed_to_fantasy_points(points_allowed: float) -> int:
 # ---------------------------------------------------------------------------
 # Download / cache helpers
 # ---------------------------------------------------------------------------
-def fetch_csv(filename: str, refresh: bool) -> pd.DataFrame:
+def fetch_csv(filename: str, url: str, refresh: bool) -> pd.DataFrame:
     """Download a source CSV into data/raw/ (or reuse the cached copy)."""
     os.makedirs(RAW_DIR, exist_ok=True)
     local_path = os.path.join(RAW_DIR, filename)
     if refresh or not os.path.exists(local_path):
-        url = SOURCES[filename]
         print(f"  downloading {filename} from {url} ...")
         df = pd.read_csv(url, low_memory=False)
         df.to_csv(local_path, index=False)
@@ -156,7 +186,7 @@ def fetch_csv(filename: str, refresh: bool) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Offense (QB / RB / WR / TE)
 # ---------------------------------------------------------------------------
-def compute_offense_totals(player_stats: pd.DataFrame, season: int) -> pd.DataFrame:
+def compute_offense_totals(weekly: pd.DataFrame, season: int) -> pd.DataFrame:
     """Season-to-date fantasy totals for offensive skill players.
 
     nflverse already computes per-game `fantasy_points` (standard) and
@@ -166,12 +196,12 @@ def compute_offense_totals(player_stats: pd.DataFrame, season: int) -> pd.DataFr
     directly against the data), half_ppr = fantasy_points + 0.5 per
     reception = the arithmetic mean of the two nflverse columns.
     """
-    df = player_stats[
-        (player_stats["season"] == season) & (player_stats["season_type"] == "REG")
+    df = weekly[
+        (weekly["season"] == season) & (weekly["season_type"] == "REG")
     ].copy()
 
     grouped = (
-        df.groupby(["player_display_name", "recent_team", "position"])
+        df.groupby(["player_display_name", "team", "position"])
         .agg(
             games_played=("week", "nunique"),
             standard_points=("fantasy_points", "sum"),
@@ -180,9 +210,7 @@ def compute_offense_totals(player_stats: pd.DataFrame, season: int) -> pd.DataFr
         .reset_index()
     )
     grouped["half_ppr_points"] = (grouped["standard_points"] + grouped["ppr_points"]) / 2
-    grouped = grouped.rename(
-        columns={"player_display_name": "player", "recent_team": "team", "position": "position"}
-    )
+    grouped = grouped.rename(columns={"player_display_name": "player"})
     # Only keep the four skill positions -- K and DEF are handled separately.
     grouped = grouped[grouped["position"].isin(["QB", "RB", "WR", "TE"])]
     return grouped[["player", "team", "position", "games_played",
@@ -192,7 +220,7 @@ def compute_offense_totals(player_stats: pd.DataFrame, season: int) -> pd.DataFr
 # ---------------------------------------------------------------------------
 # Kickers
 # ---------------------------------------------------------------------------
-def compute_kicker_totals(kicking: pd.DataFrame, season: int) -> pd.DataFrame:
+def compute_kicker_totals(weekly: pd.DataFrame, season: int) -> pd.DataFrame:
     """Season-to-date fantasy totals for kickers.
 
     Kicker scoring doesn't vary by "PPR" -- there are no receptions -- so
@@ -200,7 +228,10 @@ def compute_kicker_totals(kicking: pd.DataFrame, season: int) -> pd.DataFrame:
     keeps the output shape identical across positions, which simplifies
     the next script (build_dashboard_data.py).
     """
-    df = kicking[(kicking["season"] == season) & (kicking["season_type"] == "REG")].copy()
+    df = weekly[
+        (weekly["season"] == season) & (weekly["season_type"] == "REG")
+        & (weekly["position"] == "K")
+    ].copy()
     df["game_points"] = df.apply(kicker_points_for_row, axis=1)
 
     grouped = (
@@ -221,8 +252,7 @@ def compute_kicker_totals(kicking: pd.DataFrame, season: int) -> pd.DataFrame:
 # Team Defense / Special Teams (D/ST)
 # ---------------------------------------------------------------------------
 def compute_dst_totals(
-    player_stats_all: pd.DataFrame,
-    player_stats_def: pd.DataFrame,
+    weekly: pd.DataFrame,
     games: pd.DataFrame,
     season: int,
 ) -> pd.DataFrame:
@@ -230,44 +260,31 @@ def compute_dst_totals(
 
     Fantasy football drafts "Seattle Defense" as a single roster slot, but
     nflverse's stats are all per individual player. So we:
-      1. Sum individual defensive players' sacks/INTs/fumble recoveries/
-         defensive TDs/safeties up to the team level, per week.
-      2. Add return TDs (kickoff/punt returns) from the offensive stats
-         file's `special_teams_tds` column, also summed to team+week.
+      1. Sum every player's sacks/INTs/fumble recoveries/defensive TDs/
+         safeties up to the team level, per week (players who aren't on
+         defense just contribute zeros here, so no position filter needed).
+      2. Add return TDs (kickoff/punt returns) from the same file's
+         `special_teams_tds` column, also summed to team+week.
       3. Add a "points allowed" score per team per week, from the game
          schedule's final scores.
       4. Sum all of that across the season so far.
     """
-    def_df = player_stats_def[
-        (player_stats_def["season"] == season) & (player_stats_def["season_type"] == "REG")
+    df = weekly[
+        (weekly["season"] == season) & (weekly["season_type"] == "REG")
     ].copy()
 
     team_def_weekly = (
-        def_df.groupby(["team", "week"])
+        df.groupby(["team", "week"])
         .agg(
             sacks=("def_sacks", "sum"),
             interceptions=("def_interceptions", "sum"),
-            fumble_recoveries=("def_fumble_recovery_opp", "sum"),
+            fumble_recoveries=("fumble_recovery_opp", "sum"),
             def_tds=("def_tds", "sum"),
-            safeties=("def_safety", "sum"),
+            safeties=("def_safeties", "sum"),
+            st_tds=("special_teams_tds", "sum"),
         )
         .reset_index()
     )
-
-    # Special-teams return TDs are recorded on the *offense* stats file
-    # (they're credited to the returner, who's usually a WR/RB/CB), so we
-    # pull them from there and attribute them to that player's team.
-    st_df = player_stats_all[
-        (player_stats_all["season"] == season) & (player_stats_all["season_type"] == "REG")
-    ].copy()
-    team_st_weekly = (
-        st_df.groupby(["recent_team", "week"])["special_teams_tds"]
-        .sum()
-        .reset_index()
-        .rename(columns={"recent_team": "team", "special_teams_tds": "st_tds"})
-    )
-
-    merged = team_def_weekly.merge(team_st_weekly, on=["team", "week"], how="outer").fillna(0)
 
     # Points allowed: for each team+week, find their game and take the
     # *opponent's* score (i.e. what their defense gave up).
@@ -281,7 +298,7 @@ def compute_dst_totals(
     )
     points_allowed = pd.concat([home_rows, away_rows], ignore_index=True)
 
-    merged = merged.merge(points_allowed, on=["team", "week"], how="left")
+    merged = team_def_weekly.merge(points_allowed, on=["team", "week"], how="left")
     merged["points_allowed"] = merged["points_allowed"].fillna(0)
 
     merged["week_points"] = (
@@ -355,18 +372,33 @@ def main():
                          help="NFL season to compute current performance for, e.g. 2026")
     parser.add_argument("--refresh", action="store_true",
                          help="Re-download source CSVs instead of using the data/raw/ cache")
+    parser.add_argument("--max-week", type=int, default=None,
+                         help="Only include regular-season weeks up to and including this "
+                              "number (e.g. --max-week 1 for Week 1 only). Useful when a "
+                              "later week's games are still in progress and you don't want "
+                              "a partial week mixed into the season-to-date totals. Default: "
+                              "include every completed week found in the source data.")
     args = parser.parse_args()
 
     print(f"Fetching nflverse source data (season={args.season})...")
-    player_stats = fetch_csv("player_stats.csv", args.refresh)
-    kicking = fetch_csv("player_stats_kicking.csv", args.refresh)
-    player_stats_def = fetch_csv("player_stats_def.csv", args.refresh)
-    games = fetch_csv("games.csv", args.refresh)
+    weekly_url = f"{NFLVERSE_BASE}/stats_player/stats_player_week_{args.season}.csv"
+    weekly = fetch_csv(f"stats_player_week_{args.season}.csv", weekly_url, args.refresh)
+    games = fetch_csv("games.csv", GAMES_URL, args.refresh)
+
+    if args.max_week is not None:
+        print(f"Restricting to weeks 1-{args.max_week} of {args.season} "
+              f"(dropping any later, possibly-still-in-progress weeks)...")
+        weekly = weekly[
+            ~((weekly["season"] == args.season) & (weekly["week"] > args.max_week))
+        ]
+        games = games[
+            ~((games["season"] == args.season) & (games["week"] > args.max_week))
+        ]
 
     print("Computing season-to-date fantasy totals...")
-    offense = compute_offense_totals(player_stats, args.season)
-    kickers = compute_kicker_totals(kicking, args.season)
-    dst = compute_dst_totals(player_stats, player_stats_def, games, args.season)
+    offense = compute_offense_totals(weekly, args.season)
+    kickers = compute_kicker_totals(weekly, args.season)
+    dst = compute_dst_totals(weekly, games, args.season)
 
     combined = pd.concat([offense, kickers, dst], ignore_index=True)
 
@@ -397,9 +429,7 @@ def main():
     combined.to_csv(out_path, index=False)
     print(f"\nWrote {len(combined)} rows to {out_path}")
     if not combined.empty:
-        weeks = sorted(pd.concat([
-            player_stats[player_stats["season"] == args.season]["week"],
-        ]).unique().tolist())
+        weeks = sorted(weekly[weekly["season"] == args.season]["week"].unique().tolist())
         print(f"Weeks with data this season: {weeks}")
 
 

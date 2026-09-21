@@ -2,50 +2,31 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<style>
-  :root {
-    --paper: #eef1ec;
-    --paper-raised: #ffffff;
-    --paper-sunken: #e4e8e1;
-    --ink: #1d2420;
-    --ink-soft: #5c665f;
-    --ink-faint: #8a938c;
-    --line: #d7dbd1;
-    --accent: #a5702c;
-    --accent-ink: #ffffff;
-    --accent-tint: #f3e6d4;
-    --good: #2c7a4f;
-    --good-tint: #e2f0e6;
-    --good-line: #bcdcc7;
-    --bad: #ad4433;
-    --bad-tint: #f5e6e2;
-    --bad-line: #e0c1b8;
-    --shadow: 0 1px 2px rgba(29,36,32,0.06), 0 6px 16px -8px rgba(29,36,32,0.12);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #14181a;
-      --paper-raised: #1c2124;
-      --paper-sunken: #101314;
-      --ink: #edefe9;
-      --ink-soft: #a2ac9f;
-      --ink-faint: #6d766a;
-      --line: #2c3330;
-      --accent: #d99e57;
-      --accent-ink: #1a1206;
-      --accent-tint: #3a2c17;
-      --good: #55c383;
-      --good-tint: #16281f;
-      --good-line: #2a4636;
-      --bad: #e2806c;
-      --bad-tint: #2f1c18;
-      --bad-line: #4a2c26;
-      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+<script>
+  // Applies a saved theme choice BEFORE the page paints, so a visitor who
+  // previously picked Light doesn't see a flash of the (now-default) dark
+  // theme first. Dark itself needs no code here -- it's just what :root
+  // renders with no attribute set at all, see the CSS below. Deliberately
+  // synchronous and inline (not deferred/async) so it runs before layout.
+  (function () {
+    try {
+      if (localStorage.getItem("valueBoardTheme") === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    } catch (e) {
+      // Private-browsing / storage-disabled: fall back to the dark default.
     }
-  }
-
-  :root[data-theme="dark"] {
+  })();
+</script>
+<style>
+  /* Dark is the DEFAULT look (the bare :root block below), regardless of
+     the visitor's OS/browser color-scheme setting -- this is a deliberate
+     product choice (see the theme-toggle button in the masthead), not a
+     "respect system preference" setup. A visitor who explicitly picks
+     Light gets `data-theme="light"` stamped on <html> by the toggle
+     script near the bottom of this file, which is what the second block
+     below is for. */
+  :root {
     --paper: #14181a;
     --paper-raised: #1c2124;
     --paper-sunken: #101314;
@@ -63,6 +44,26 @@
     --bad-tint: #2f1c18;
     --bad-line: #4a2c26;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+  }
+
+  :root[data-theme="light"] {
+    --paper: #eef1ec;
+    --paper-raised: #ffffff;
+    --paper-sunken: #e4e8e1;
+    --ink: #1d2420;
+    --ink-soft: #5c665f;
+    --ink-faint: #8a938c;
+    --line: #d7dbd1;
+    --accent: #a5702c;
+    --accent-ink: #ffffff;
+    --accent-tint: #f3e6d4;
+    --good: #2c7a4f;
+    --good-tint: #e2f0e6;
+    --good-line: #bcdcc7;
+    --bad: #ad4433;
+    --bad-tint: #f5e6e2;
+    --bad-line: #e0c1b8;
+    --shadow: 0 1px 2px rgba(29,36,32,0.06), 0 6px 16px -8px rgba(29,36,32,0.12);
   }
 
   * { box-sizing: border-box; }
@@ -124,6 +125,12 @@
     transform: translateY(-2px);
   }
 
+  .masthead-right {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
   .masthead-meta {
     text-align: right;
     font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -136,6 +143,40 @@
     color: var(--ink);
     font-weight: 600;
   }
+
+  /* ---------- Theme toggle ---------- */
+  /* One button, top-right of the masthead. It shows the icon for the
+     CURRENT mode (moon while dark, sun once switched to light) -- which
+     icon is visible is driven purely by the [data-theme] attribute via
+     CSS, so there's no risk of the two states drifting out of sync with
+     each other; script.js (bottom of this file) only ever flips the
+     attribute + localStorage, it never touches these icons directly. */
+  .theme-toggle {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper-sunken);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .theme-toggle:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  .theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .theme-toggle .icon-sun { display: none; }
+  .theme-toggle .icon-moon { display: block; }
+  :root[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+  :root[data-theme="light"] .theme-toggle .icon-moon { display: none; }
 
   .subhead {
     font-size: 15.5px;
@@ -417,9 +458,20 @@
       <h1>Value Board</h1>
       <span class="mark">ADP Watch</span>
     </div>
-    <div class="masthead-meta">
-      BOS ADP locked <strong id="lockDate">&mdash;</strong> &middot; scoring <strong id="scoringFormat">&mdash;</strong><br>
-      <span id="sourceLine">source &mdash;</span>
+    <div class="masthead-right">
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="3.3" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 1.3v1.7M8 13v1.7M1.3 8h1.7M13 8h1.7M3.4 3.4l1.2 1.2M11.4 11.4l1.2 1.2M12.6 3.4l-1.2 1.2M4.6 11.4l-1.2 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M13.4 9.7A5.8 5.8 0 1 1 6.3 2.6a4.6 4.6 0 0 0 7.1 7.1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="masthead-meta">
+        BOS ADP locked <strong id="lockDate">&mdash;</strong> &middot; scoring <strong id="scoringFormat">&mdash;</strong><br>
+        <span id="sourceLine">source &mdash;</span>
+      </div>
     </div>
   </div>
 
@@ -513,7 +565,17 @@
   const RAW = __DASHBOARD_JSON__;
 
   const DATA = RAW.positions;   // { "QB": [ {player, team, overallRank, gamesPlayed, formats: {standard, half_ppr, ppr}}, ... ], ... }
-  const META = RAW.meta;        // { season, generatedAt, defaultScoringFormat, maxGamesPlayed, status, playersMatched, playersUnmatched }
+  const META = RAW.meta;        // { season, generatedAt, defaultScoringFormat, maxGamesPlayed, status, playersMatched, playersUnmatched, positionRankCaps }
+
+  // Every adpRank/currentRankTotal/currentRankPPG value coming out of
+  // build_dashboard_data.py is already capped to this position's
+  // roster-depth cutoff (e.g. every RB ranked 37th-or-worse, whether by
+  // ADP or by current performance, arrives here already as the number 37
+  // -- see POSITION_RANK_CAPS in that script). POSITION_RANK_CAPS here is
+  // only used to know *which* rank number means "this cutoff and
+  // everyone below it," so it can be labeled "RB37+" instead of a bare
+  // "RB37" that looks like an exact rank.
+  const POSITION_RANK_CAPS = META.positionRankCaps || {};
 
   // Each `formats` entry is {adpRank, adp, currentRankTotal, deltaTotal,
   // currentRankPPG, deltaPPG} -- or all-null if that player has no ADP in
@@ -615,6 +677,49 @@
     btn.addEventListener("click", () => { scope = btn.dataset.scope; render(); });
   });
 
+  // ---- Light/dark theme toggle ---------------------------------------------
+  // Dark is the default (see the <script> above and the bare :root block in
+  // the CSS) -- this button is the only way to switch to light, and the
+  // choice is remembered per-browser via localStorage. The sun/moon icon
+  // swap itself is pure CSS (keyed off [data-theme]); this handler only
+  // flips the attribute, persists it, and keeps the button's aria state
+  // (screen readers/automated tooling can't read the CSS-only icon swap)
+  // in sync.
+  const themeToggleBtn = document.getElementById("themeToggle");
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  }
+  function updateThemeToggleLabel() {
+    const isLight = currentTheme() === "light";
+    themeToggleBtn.setAttribute("aria-pressed", isLight ? "true" : "false");
+    themeToggleBtn.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+  }
+  themeToggleBtn.addEventListener("click", () => {
+    const next = currentTheme() === "light" ? "dark" : "light";
+    // "dark" is stored by simply removing the attribute/key, since dark is
+    // what :root already renders with nothing set -- keeps the saved value
+    // and the CSS default from ever being able to disagree with each other.
+    if (next === "dark") {
+      document.documentElement.removeAttribute("data-theme");
+      try { localStorage.removeItem("valueBoardTheme"); } catch (e) {}
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+      try { localStorage.setItem("valueBoardTheme", "light"); } catch (e) {}
+    }
+    updateThemeToggleLabel();
+  });
+  updateThemeToggleLabel();
+
+  // Renders a rank as e.g. "RB12" or, at/below that position's roster-depth
+  // cutoff, "RB37+" -- the trailing "+" is the only signal in the UI that
+  // this number represents "this deep or worse," not an exact rank.
+  function rankLabel(pos, rank) {
+    if (rank === null || rank === undefined) return `${pos}–`;
+    const cap = POSITION_RANK_CAPS[pos];
+    const suffix = cap !== undefined && rank === cap + 1 ? "+" : "";
+    return `${pos}${rank}${suffix}`;
+  }
+
   function deltaChip(delta) {
     const cls = delta > 0 ? "pos" : delta < 0 ? "neg" : "zero";
     const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "–";
@@ -630,8 +735,8 @@
           <span class="player-sub">${p.team} &middot; pick ${p.adp.toFixed(1)}</span>
         </div>
       </td>
-      <td class="mid"><span class="rank-chip">${p.pos}${p.adpRank}</span></td>
-      <td class="mid"><span class="rank-chip">${p.pos}${p.currentRank}</span></td>
+      <td class="mid"><span class="rank-chip">${rankLabel(p.pos, p.adpRank)}</span></td>
+      <td class="mid"><span class="rank-chip">${rankLabel(p.pos, p.currentRank)}</span></td>
       <td class="num">${deltaChip(p.delta)}</td>
     </tr>`;
   }

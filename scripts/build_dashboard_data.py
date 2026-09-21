@@ -51,6 +51,17 @@ matching the dashboard's PPR / Half-PPR / Standard toggle. Inside each one:
 ...so the dashboard's Scoring format and Season Total/Per Game toggles can
 both be switched client-side, without re-running this script.
 
+POSITION-DEPTH CUTOFFS ("RB37+" style buckets)
+-------------------------------------------------
+Every adpRank/currentRankTotal/currentRankPPG value above is capped to a
+per-position roster-depth cutoff defined in POSITION_RANK_CAPS below (e.g.
+RB ranks stop at 36 -- anyone drafted/performing 37th or worse at the
+position is bucketed together as rank 37). This applies to both sides of
+the comparison and to the delta between them, so a deep-bench player's
+huge single-week performance can't manufacture a misleadingly large delta
+against an equally-deep-bench ADP slot. See POSITION_RANK_CAPS and
+cap_rank() for the exact cutoffs and how they're applied.
+
 USAGE
 -----
     python3 build_dashboard_data.py --season 2026
@@ -84,6 +95,49 @@ FORMATS = [
 # Which format the dashboard should show on first load. Purely a default --
 # the toggle lets a viewer switch to either of the other two at any time.
 DEFAULT_SCORING_FORMAT = "ppr"
+
+# ---------------------------------------------------------------------------
+# Position-depth cutoffs ("bucketing")
+# ---------------------------------------------------------------------------
+# Below the roster-relevant depth at each position, exactly *how* deep a
+# player is drafted/ranked stops meaning anything practically (there's no
+# real difference between "RB40" and "RB60" -- neither is getting drafted
+# or started in a normal league). So instead of showing/using the raw
+# position rank past this cutoff, every player ranked beyond it -- in ADP
+# *and* in current-season performance -- is bucketed together at
+# `cutoff + 1` and displayed as e.g. "RB37+". This applies uniformly to
+# both halves of the comparison (ADP rank and Now Rk) and to the delta
+# computed between them, so a strong Week-1 game by a deep-bench player
+# doesn't manufacture a huge, meaningless delta against their (also
+# bucketed) ADP rank.
+#
+# These are roster-depth judgment calls, not derived from anything in the
+# data -- edit the numbers here to change where each position's cutoff
+# sits.
+POSITION_RANK_CAPS = {
+    "QB": 24,
+    "RB": 36,
+    "WR": 36,
+    "TE": 24,
+    "D/ST": 12,
+    "K": 12,
+}
+
+
+def cap_rank(rank, position):
+    """Clamp a within-position rank to this project's roster-depth cutoff
+    (POSITION_RANK_CAPS above). Anyone ranked beyond the cutoff -- whether
+    by ADP or by current performance -- is treated as tied at `cutoff + 1`
+    everywhere: in the displayed rank, and in the delta math against the
+    other side of the comparison. `None` passes through unchanged (no ADP,
+    or no current-season stats yet, stays "no data" rather than becoming a
+    fake rank)."""
+    if rank is None:
+        return None
+    cap = POSITION_RANK_CAPS.get(position)
+    if cap is None:
+        return rank
+    return min(rank, cap + 1)
 
 
 def load_bos_adp() -> pd.DataFrame:
@@ -191,12 +245,15 @@ def build_dataset(season: int):
                 }
                 continue
 
-            adp_rank = int(adp_rank_raw)
+            # Every rank below is capped to this position's roster-depth
+            # cutoff (POSITION_RANK_CAPS) before it's stored or used in any
+            # delta math -- see cap_rank()'s docstring above.
+            adp_rank = cap_rank(int(adp_rank_raw), row["position"])
             current_rank_total = None
             current_rank_ppg = None
             if perf_row is not None:
-                current_rank_total = int(perf_row[f"{key}_pos_rank"])
-                current_rank_ppg = int(perf_row[f"{key}_ppg_pos_rank"])
+                current_rank_total = cap_rank(int(perf_row[f"{key}_pos_rank"]), row["position"])
+                current_rank_ppg = cap_rank(int(perf_row[f"{key}_ppg_pos_rank"]), row["position"])
 
             formats[key] = {
                 "adpRank": adp_rank,
@@ -228,6 +285,11 @@ def build_dataset(season: int):
         "status": "in_season" if total_games_played > 0 else "pre_season",
         "playersMatched": matched,
         "playersUnmatched": len(unmatched),
+        # Passed through so the front end knows, per position, which
+        # displayed rank number means "this cutoff and everyone below it"
+        # -- it renders that value with a trailing "+" (e.g. "RB37+").
+        # Keep this in sync with POSITION_RANK_CAPS above.
+        "positionRankCaps": POSITION_RANK_CAPS,
     }
 
     print(f"Matched {matched}/{len(adp)} ADP players to current-season performance "
