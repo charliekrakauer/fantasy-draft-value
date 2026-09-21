@@ -29,15 +29,24 @@ looks longer than "a few backup kickers/defenses nobody rosters," something
 is probably wrong with the matching logic and is worth a look before you
 trust the dashboard.
 
-A player with NO current-season stats yet (rookie who hasn't debuted,
-season hasn't started, etc.) gets null current-rank/delta fields rather
-than a fabricated number -- the front end shows "–" for these instead of
-pretending we know something we don't. Likewise, a player missing from one
-scoring format's ADP column in the source file (a blank cell -- see the
-Notes tab of the original ADP workbook) gets nulled out entirely *for that
-format*, so switching the dashboard's scoring-format toggle to a format
-that player lacks just drops them from view rather than showing a broken
-row.
+Before the season has started AT ALL (no player anywhere has a stat line
+yet), a player with no current-season stats gets null current-rank/delta
+fields rather than a fabricated number -- the front end shows its
+"waiting on this season's first games" empty state instead of pretending
+we know something we don't. Once the season IS underway, though, a player
+who *still* has no stat line this week (hasn't debuted, on bye, injured,
+or a name that didn't match -- see MATCHING PLAYERS below) is instead
+bucketed at their position's "+" cutoff, same as anyone ranked beyond it
+-- see cap_or_bucket_rank()'s docstring. That keeps every position's
+full/"See All" list genuinely complete: every player from the preseason
+ADP dataset gets a Now Rk slot somewhere, rather than quietly vanishing
+from the dashboard.
+
+Separately, a player missing from one scoring format's ADP column in the
+source file (a blank cell -- see the Notes tab of the original ADP
+workbook) gets nulled out entirely *for that format*, so switching the
+dashboard's scoring-format toggle to a format that player lacks just
+drops them from view rather than showing a broken row.
 
 THREE SCORING FORMATS, EACH WITH TWO "NOW RK" MODES
 ------------------------------------------------------
@@ -140,6 +149,32 @@ def cap_rank(rank, position):
     return min(rank, cap + 1)
 
 
+def cap_or_bucket_rank(rank, position, season_started):
+    """Same clamping as cap_rank(), but a player with NO current-season
+    rank at all (rank is None -- no stat line this week: injured, on
+    bye, or just a name nflverse's file doesn't match) is bucketed at
+    `cutoff + 1` too, the same "+"-suffixed group used for anyone ranked
+    beyond the cutoff, instead of being left out of the dashboard
+    entirely. That keeps every position's full/"See All" list genuinely
+    complete -- every player from the preseason ADP dataset gets a Now
+    Rk slot, even one who hasn't produced anything yet.
+
+    The one exception is `season_started=False`: before ANY player at
+    this position has a current-week stat line (i.e. this build ran
+    before Week 1 games happened at all), bucketing everyone at once
+    would fabricate a "worst possible performer" for the entire
+    dashboard before a single snap has been played. In that case this
+    still returns None for everyone, same as cap_rank(None, ...), and
+    the front end shows its "waiting on this season's first games"
+    empty state instead."""
+    if rank is not None:
+        return cap_rank(rank, position)
+    if not season_started:
+        return None
+    cap = POSITION_RANK_CAPS.get(position)
+    return cap + 1 if cap is not None else None
+
+
 def load_bos_adp() -> pd.DataFrame:
     """Load the locked preseason ADP file and normalize it into a common
     shape: one row per player/defense with position, a join key, and --
@@ -212,6 +247,12 @@ def build_dataset(season: int):
     if not perf.empty:
         perf_lookup = perf.set_index("join_key").to_dict(orient="index")
 
+    # Whether the season has actually gotten underway -- i.e. at least
+    # one player anywhere has a current-week stat line. Gates the
+    # "bucket the missing ones" behavior in cap_or_bucket_rank() below;
+    # see its docstring for why that matters.
+    season_started = not perf.empty
+
     matched, unmatched = 0, []
     by_position = {}
 
@@ -247,13 +288,17 @@ def build_dataset(season: int):
 
             # Every rank below is capped to this position's roster-depth
             # cutoff (POSITION_RANK_CAPS) before it's stored or used in any
-            # delta math -- see cap_rank()'s docstring above.
+            # delta math -- see cap_rank()'s docstring above. A player with
+            # no current-week stat line at all falls through to
+            # cap_or_bucket_rank(None, ...), which -- once the season is
+            # underway -- buckets them into the same "+" overflow group
+            # rather than leaving them out of the dashboard, so every
+            # preseason-ADP player at this position gets a Now Rk slot.
             adp_rank = cap_rank(int(adp_rank_raw), row["position"])
-            current_rank_total = None
-            current_rank_ppg = None
-            if perf_row is not None:
-                current_rank_total = cap_rank(int(perf_row[f"{key}_pos_rank"]), row["position"])
-                current_rank_ppg = cap_rank(int(perf_row[f"{key}_ppg_pos_rank"]), row["position"])
+            raw_current_total = int(perf_row[f"{key}_pos_rank"]) if perf_row is not None else None
+            raw_current_ppg = int(perf_row[f"{key}_ppg_pos_rank"]) if perf_row is not None else None
+            current_rank_total = cap_or_bucket_rank(raw_current_total, row["position"], season_started)
+            current_rank_ppg = cap_or_bucket_rank(raw_current_ppg, row["position"], season_started)
 
             formats[key] = {
                 "adpRank": adp_rank,
@@ -296,7 +341,13 @@ def build_dataset(season: int):
           "(this count is format-independent -- a player can still be missing ADP "
           "in one particular scoring format even when matched here).")
     if unmatched:
-        print(f"Unmatched ({len(unmatched)}) -- these will show ADP rank only, no current rank:")
+        bucket_note = (
+            "these will be bucketed at their position's '+' cutoff (e.g. 'RB37+') "
+            "once the season is underway, rather than shown with no current rank at all:"
+            if season_started else
+            "these show ADP rank only, no current rank, since the season hasn't started yet:"
+        )
+        print(f"Unmatched ({len(unmatched)}) -- {bucket_note}")
         for name in unmatched[:25]:
             print(f"  - {name}")
         if len(unmatched) > 25:

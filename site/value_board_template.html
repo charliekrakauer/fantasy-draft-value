@@ -967,14 +967,17 @@
       });
     const n = full.length;
 
-    // Only players with an actual current-season rank can be placed on
-    // either the Overperformers or Underperformers list -- there's
-    // nothing to compare yet for a player with no games played. On top of
-    // that, a player whose ADP *and* current rank are both bucketed at
-    // this position's "+" cutoff (e.g. both show "RB37+") is excluded
-    // entirely: their delta is always exactly 0 (two bucketed values
-    // compared to each other), so they're not a real riser or faller --
-    // just noise crowding out the players who actually moved.
+    // Once the season is underway, build_dashboard_data.py buckets a
+    // player with no current-week stat line at this position's "+"
+    // cutoff (see cap_or_bucket_rank() there) instead of leaving their
+    // rank null -- so delta is only ever null here in the true
+    // preseason state (nobody anywhere has played yet), which is caught
+    // by the empty-state branch below. On top of that, a player whose
+    // ADP *and* current rank are both bucketed at this position's "+"
+    // cutoff (e.g. both show "RB37+") is excluded entirely: their delta
+    // is always exactly 0 (two bucketed values compared to each other),
+    // so they're not a real riser or faller -- just noise crowding out
+    // the players who actually moved.
     const reporting = full.filter(p =>
       p.delta !== null && !(isCappedRank(p.pos, p.adpRank) && isCappedRank(p.pos, p.currentRank))
     );
