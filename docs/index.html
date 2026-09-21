@@ -12,49 +12,29 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <script>
   // Applies a saved theme choice BEFORE the page paints, so a visitor who
-  // previously picked Light doesn't see a flash of the (now-default) dark
-  // theme first. Dark itself needs no code here -- it's just what :root
+  // previously picked Dark doesn't see a flash of the (now-default) light
+  // theme first. Light itself needs no code here -- it's just what :root
   // renders with no attribute set at all, see the CSS below. Deliberately
   // synchronous and inline (not deferred/async) so it runs before layout.
   (function () {
     try {
-      if (localStorage.getItem("valueBoardTheme") === "light") {
-        document.documentElement.setAttribute("data-theme", "light");
+      if (localStorage.getItem("valueBoardTheme") === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
       }
     } catch (e) {
-      // Private-browsing / storage-disabled: fall back to the dark default.
+      // Private-browsing / storage-disabled: fall back to the light default.
     }
   })();
 </script>
 <style>
-  /* Dark is the DEFAULT look (the bare :root block below), regardless of
+  /* Light is the DEFAULT look (the bare :root block below), regardless of
      the visitor's OS/browser color-scheme setting -- this is a deliberate
      product choice (see the theme-toggle button in the masthead), not a
      "respect system preference" setup. A visitor who explicitly picks
-     Light gets `data-theme="light"` stamped on <html> by the toggle
-     script near the bottom of this file, which is what the second block
-     below is for. */
+     Dark gets `data-theme="dark"` stamped on <html> by the toggle script
+     near the bottom of this file, which is what the second block below
+     is for. */
   :root {
-    --paper: #14181a;
-    --paper-raised: #1c2124;
-    --paper-sunken: #101314;
-    --ink: #edefe9;
-    --ink-soft: #a2ac9f;
-    --ink-faint: #6d766a;
-    --line: #2c3330;
-    --accent: #d99e57;
-    --accent-ink: #1a1206;
-    --accent-tint: #3a2c17;
-    --good: #55c383;
-    --good-tint: #16281f;
-    --good-line: #2a4636;
-    --bad: #e2806c;
-    --bad-tint: #2f1c18;
-    --bad-line: #4a2c26;
-    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
-  }
-
-  :root[data-theme="light"] {
     --paper: #eef1ec;
     --paper-raised: #ffffff;
     --paper-sunken: #e4e8e1;
@@ -72,6 +52,26 @@
     --bad-tint: #f5e6e2;
     --bad-line: #e0c1b8;
     --shadow: 0 1px 2px rgba(29,36,32,0.06), 0 6px 16px -8px rgba(29,36,32,0.12);
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #14181a;
+    --paper-raised: #1c2124;
+    --paper-sunken: #101314;
+    --ink: #edefe9;
+    --ink-soft: #a2ac9f;
+    --ink-faint: #6d766a;
+    --line: #2c3330;
+    --accent: #d99e57;
+    --accent-ink: #1a1206;
+    --accent-tint: #3a2c17;
+    --good: #55c383;
+    --good-tint: #16281f;
+    --good-line: #2a4636;
+    --bad: #e2806c;
+    --bad-tint: #2f1c18;
+    --bad-line: #4a2c26;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
   }
 
   * { box-sizing: border-box; }
@@ -155,7 +155,7 @@
 
   /* ---------- Theme toggle ---------- */
   /* One button, top-right of the masthead. It shows the icon for the
-     CURRENT mode (moon while dark, sun once switched to light) -- which
+     CURRENT mode (sun while light, moon once switched to dark) -- which
      icon is visible is driven purely by the [data-theme] attribute via
      CSS, so there's no risk of the two states drifting out of sync with
      each other; script.js (bottom of this file) only ever flips the
@@ -182,10 +182,10 @@
     outline-offset: 2px;
   }
 
-  .theme-toggle .icon-sun { display: none; }
-  .theme-toggle .icon-moon { display: block; }
-  :root[data-theme="light"] .theme-toggle .icon-sun { display: block; }
-  :root[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+  .theme-toggle .icon-sun { display: block; }
+  .theme-toggle .icon-moon { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
 
   .subhead {
     font-size: 15.5px;
@@ -348,8 +348,17 @@
     font-family: "IBM Plex Mono", monospace;
   }
 
+  /* Fixed layout, with an explicit width on every column except Player
+     (which absorbs whatever's left) -- this is what actually keeps every
+     header perfectly still. With the browser's default "auto" table
+     layout, column widths are recomputed from whichever rows happen to
+     be on screen, so switching from the Top 10 to the full "See All"
+     list (a different set of players, with differently-sized names and
+     rank chips) reflows every column width and visibly shifts every
+     header -- the sort triangles were never the real cause of that. */
   table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
@@ -369,7 +378,55 @@
 
   thead th.num, td.num { text-align: right; }
   thead th.mid, td.mid { text-align: center; }
-  thead th.idx, td.idx { text-align: right; width: 1%; }
+  thead th.idx, td.idx { text-align: right; width: 30px; }
+  /* Fixed pixel widths (rather than the old width:1% on just .idx) are
+     what table-layout: fixed above actually needs -- generous enough to
+     fit this column's widest possible content (e.g. a "D/ST13+" rank
+     chip, or a "▲ 36" delta chip) with room to spare, in either state. */
+  thead th.mid { width: 96px; }
+  thead th.num { width: 84px; }
+
+  /* ADP Rk / Now Rk / Delta headers become clickable sort controls, but
+     only once a panel is expanded via "See All" -- collapsed (Top 10),
+     they're plain static labels exactly like every other header, so the
+     default view keeps its normal, uncluttered look. th.sort-enabled is
+     toggled in JS's updateSortHeaders(); th.active-sort marks whichever
+     one is the current sort column, and th.sort-asc flips that column's
+     triangle to point up instead of down.
+
+     The triangle glyph itself is ALWAYS in the markup, at fixed size, to
+     the left of the label -- going between collapsed and expanded (or
+     switching the active column) only ever changes its opacity/color/
+     rotation, never its box size or presence in the DOM. That's
+     deliberate: toggling `display`/content here is exactly what caused
+     the header labels to visibly shift a pixel or two, since the browser
+     had to reflow the centered/right-aligned text around a space that
+     was appearing and disappearing. Reserving that space permanently
+     makes the labels' positions completely static. */
+  th.sortable.sort-enabled { cursor: pointer; }
+  th.sortable.sort-enabled:hover { color: var(--ink); }
+
+  .sort-tri {
+    display: inline-block;
+    width: 8px;
+    margin-right: 3px;
+    font-size: 8px;
+    line-height: 1;
+    color: var(--ink-faint);
+    opacity: 0;
+    transform: translateY(-1px);
+  }
+
+  th.sortable.sort-enabled .sort-tri { opacity: 0.45; }
+
+  th.sortable.sort-enabled.active-sort .sort-tri {
+    color: var(--ink);
+    opacity: 1;
+  }
+
+  th.sortable.sort-enabled.active-sort.sort-asc .sort-tri {
+    transform: translateY(-1px) rotate(180deg);
+  }
 
   tbody tr { border-bottom: 1px solid var(--line); }
   tbody tr:last-child { border-bottom: none; }
@@ -481,7 +538,7 @@
       <div class="masthead-meta">
         <span id="sourceLine">&mdash;</span>
       </div>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false">
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark mode" aria-pressed="false">
         <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <circle cx="8" cy="8" r="3.3" stroke="currentColor" stroke-width="1.4"/>
           <path d="M8 1.3v1.7M8 13v1.7M1.3 8h1.7M13 8h1.7M3.4 3.4l1.2 1.2M11.4 11.4l1.2 1.2M12.6 3.4l-1.2 1.2M4.6 11.4l-1.2 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -530,9 +587,9 @@
             <tr>
               <th class="idx">#</th>
               <th>Player</th>
-              <th class="mid">ADP Rk</th>
-              <th class="mid">Now Rk</th>
-              <th class="num">Delta</th>
+              <th class="mid sortable" data-panel="over" data-col="adp"><span class="sort-tri">&#9662;</span>ADP Rk</th>
+              <th class="mid sortable" data-panel="over" data-col="now"><span class="sort-tri">&#9662;</span>Now Rk</th>
+              <th class="num sortable" data-panel="over" data-col="delta"><span class="sort-tri">&#9662;</span>Delta</th>
             </tr>
           </thead>
           <tbody id="overBody"></tbody>
@@ -555,9 +612,9 @@
             <tr>
               <th class="idx">#</th>
               <th>Player</th>
-              <th class="mid">ADP Rk</th>
-              <th class="mid">Now Rk</th>
-              <th class="num">Delta</th>
+              <th class="mid sortable" data-panel="under" data-col="adp"><span class="sort-tri">&#9662;</span>ADP Rk</th>
+              <th class="mid sortable" data-panel="under" data-col="now"><span class="sort-tri">&#9662;</span>Now Rk</th>
+              <th class="num sortable" data-panel="under" data-col="delta"><span class="sort-tri">&#9662;</span>Delta</th>
             </tr>
           </thead>
           <tbody id="underBody"></tbody>
@@ -630,6 +687,19 @@
   // looking at an oddly-already-expanded list.
   let overExpanded = false;
   let underExpanded = false;
+
+  // Sort control for the ADP Rk / Now Rk / Delta headers -- only reachable
+  // once a panel is expanded (see updateSortHeaders()). `col` is one of
+  // "adp" / "now" / "delta"; `dir` is "asc" or "desc". These defaults
+  // match each panel's original fixed ordering (Overperformers: best
+  // delta first; Underperformers: worst delta first), so collapsing back
+  // to Top 10 and resetting to these values reproduces the exact same
+  // list either way.
+  const DEFAULT_OVER_SORT = { col: "delta", dir: "desc" };
+  const DEFAULT_UNDER_SORT = { col: "delta", dir: "asc" };
+  let overSort = { ...DEFAULT_OVER_SORT };
+  let underSort = { ...DEFAULT_UNDER_SORT };
+
   // "Now Rk" can mean two different things -- each player's rank by total
   // points scored this season, or by their points-per-game -- and this
   // dashboard defaults to season-total. `metric` tracks which is active;
@@ -681,6 +751,8 @@
       currentPos = pos;
       overExpanded = false;
       underExpanded = false;
+      overSort = { ...DEFAULT_OVER_SORT };
+      underSort = { ...DEFAULT_UNDER_SORT };
       render();
     });
     positionToggleEl.appendChild(btn);
@@ -708,18 +780,50 @@
   });
 
   // ---- Per-panel "See All" / "Show Top 10" buttons ---------------------------
+  // Collapsing back to Top 10 also resets that panel's sort back to its
+  // default (best/worst delta first) and hides its header triangles --
+  // "Show Top 10" always returns to the exact same plain view.
   document.getElementById("overSeeAllBtn").addEventListener("click", () => {
     overExpanded = !overExpanded;
+    if (!overExpanded) overSort = { ...DEFAULT_OVER_SORT };
     render();
   });
   document.getElementById("underSeeAllBtn").addEventListener("click", () => {
     underExpanded = !underExpanded;
+    if (!underExpanded) underSort = { ...DEFAULT_UNDER_SORT };
     render();
   });
 
+  // ---- Sortable ADP Rk / Now Rk / Delta headers -----------------------------
+  // Only meaningful once a panel is expanded (updateSortHeaders(), called
+  // from render(), is what actually makes these look/act clickable) --
+  // the listeners are harmless no-ops while collapsed, since render()
+  // never reads a stale sort in that state.
+  document.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const panel = th.dataset.panel;   // "over" | "under"
+      const col = th.dataset.col;       // "adp" | "now" | "delta"
+      const expanded = panel === "over" ? overExpanded : underExpanded;
+      if (!expanded) return;
+      const sortState = panel === "over" ? overSort : underSort;
+      if (sortState.col === col) {
+        sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+      } else {
+        sortState.col = col;
+        // A fresh rank column starts best-first (rank 1 at the top); a
+        // fresh Delta column starts at this panel's own natural
+        // direction (best/worst delta first), matching DEFAULT_*_SORT.
+        sortState.dir = col === "delta"
+          ? (panel === "over" ? DEFAULT_OVER_SORT.dir : DEFAULT_UNDER_SORT.dir)
+          : "asc";
+      }
+      render();
+    });
+  });
+
   // ---- Light/dark theme toggle ---------------------------------------------
-  // Dark is the default (see the <script> above and the bare :root block in
-  // the CSS) -- this button is the only way to switch to light, and the
+  // Light is the default (see the <script> above and the bare :root block
+  // in the CSS) -- this button is the only way to switch to dark, and the
   // choice is remembered per-browser via localStorage. The sun/moon icon
   // swap itself is pure CSS (keyed off [data-theme]); this handler only
   // flips the attribute, persists it, and keeps the button's aria state
@@ -727,24 +831,25 @@
   // in sync.
   const themeToggleBtn = document.getElementById("themeToggle");
   function currentTheme() {
-    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   }
   function updateThemeToggleLabel() {
-    const isLight = currentTheme() === "light";
-    themeToggleBtn.setAttribute("aria-pressed", isLight ? "true" : "false");
-    themeToggleBtn.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+    const isDark = currentTheme() === "dark";
+    themeToggleBtn.setAttribute("aria-pressed", isDark ? "true" : "false");
+    themeToggleBtn.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
   }
   themeToggleBtn.addEventListener("click", () => {
-    const next = currentTheme() === "light" ? "dark" : "light";
-    // "dark" is stored by simply removing the attribute/key, since dark is
-    // what :root already renders with nothing set -- keeps the saved value
-    // and the CSS default from ever being able to disagree with each other.
-    if (next === "dark") {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    // "light" is stored by simply removing the attribute/key, since light
+    // is what :root already renders with nothing set -- keeps the saved
+    // value and the CSS default from ever being able to disagree with
+    // each other.
+    if (next === "light") {
       document.documentElement.removeAttribute("data-theme");
       try { localStorage.removeItem("valueBoardTheme"); } catch (e) {}
     } else {
-      document.documentElement.setAttribute("data-theme", "light");
-      try { localStorage.setItem("valueBoardTheme", "light"); } catch (e) {}
+      document.documentElement.setAttribute("data-theme", "dark");
+      try { localStorage.setItem("valueBoardTheme", "dark"); } catch (e) {}
     }
     updateThemeToggleLabel();
   });
@@ -763,6 +868,36 @@
     const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "–";
     const label = delta === 0 ? "even" : Math.abs(delta);
     return `<span class="delta-chip ${cls}">${arrow} ${label}</span>`;
+  }
+
+  // Maps a sort state's "col" to the actual field on each row object.
+  const SORT_FIELDS = { adp: "adpRank", now: "currentRank", delta: "delta" };
+
+  // Sorts `list` by the given {col, dir} sort state. Ties break by ADP
+  // rank ascending (best-drafted first) no matter which column is
+  // active, same tie-break the fixed delta-based ordering always used.
+  function sortList(list, sortState) {
+    const field = SORT_FIELDS[sortState.col];
+    const mult = sortState.dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => (a[field] - b[field]) * mult || a.adpRank - b.adpRank);
+  }
+
+  // Wires up one panel's three column headers: while collapsed, they're
+  // plain static labels (no triangle, no pointer cursor) so the default
+  // view looks exactly like it always has; once expanded, all three show
+  // a small triangle (a "you can sort by this" hint), and whichever one
+  // is the active sort column is highlighted with its triangle pointing
+  // in the current direction.
+  function updateSortHeaders(panel, expanded, sortState) {
+    document.querySelectorAll(`th.sortable[data-panel="${panel}"]`).forEach(th => {
+      const isActive = expanded && th.dataset.col === sortState.col;
+      // Only opacity/color/rotation ever change here -- never the
+      // triangle's text content or the header's layout -- so the label
+      // never shifts (see the CSS comment on .sort-tri for why).
+      th.classList.toggle("sort-enabled", expanded);
+      th.classList.toggle("active-sort", isActive);
+      th.classList.toggle("sort-asc", isActive && sortState.dir === "asc");
+    });
   }
 
   // `idx` is this row's position within the currently-displayed list
@@ -867,11 +1002,17 @@
       document.getElementById("underFoot").textContent = "Waiting on this season's first games.";
       overSeeAllBtn.hidden = true;
       underSeeAllBtn.hidden = true;
+      updateSortHeaders("over", false, overSort);
+      updateSortHeaders("under", false, underSort);
       return;
     }
 
-    const overSorted = [...reporting].sort((a, b) => b.delta - a.delta || a.adpRank - b.adpRank);
-    const underSorted = [...reporting].sort((a, b) => a.delta - b.delta || a.adpRank - b.adpRank);
+    // Sorted by whichever column/direction that panel's headers are
+    // currently set to (ADP Rk, Now Rk, or Delta) -- overSort/underSort
+    // default to "best/worst delta first," so with nothing clicked this
+    // reproduces the same ordering the dashboard always used.
+    const overSorted = sortList(reporting, overSort);
+    const underSorted = sortList(reporting, underSort);
 
     const overList = overExpanded ? overSorted : overSorted.slice(0, TOP_N);
     const underList = underExpanded ? underSorted : underSorted.slice(0, TOP_N);
@@ -887,6 +1028,9 @@
     const notReportingNote = notReporting > 0 ? ` (${notReporting} not reporting yet)` : "";
     renderPanelFoot("over", reporting.length, overExpanded, notReportingNote);
     renderPanelFoot("under", reporting.length, underExpanded, notReportingNote);
+
+    updateSortHeaders("over", overExpanded, overSort);
+    updateSortHeaders("under", underExpanded, underSort);
   }
 
   render();
